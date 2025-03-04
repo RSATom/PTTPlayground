@@ -7,8 +7,16 @@ struct ContentView: View {
 
     var body: some View {
         VStack {
-            Spacer()
+            Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.05)
 
+            HStack {
+                Spacer()
+                Toggle(isOn: $controller.useAVAudioRecorder) {
+                    Text("Use AVAudioRecorder")
+                }
+                Spacer()
+            }
+            Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
             HStack {
                 Spacer()
                 Toggle(isOn: $controller.breakPtt) {

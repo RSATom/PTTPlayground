@@ -15,6 +15,14 @@ class Controller: ObservableObject {
             self.ptt.brokeBy = newValue ? .VoiceChatMode : .None
         }
     }
+    var useAVAudioRecorder: Bool {
+        get {
+            self.ptt.useAudioRecorder
+        }
+        set {
+            self.ptt.useAudioRecorder = newValue
+        }
+    }
 
     init() {
         AVAudioApplication.requestRecordPermission() { granted in

@@ -4,8 +4,6 @@ import Foundation
 import AVFAudio
 import PushToTalk
 
-private let UseAudioRecorder = false
-
 extension AVAudioSession.RouteChangeReason: @retroactive CustomDebugStringConvertible {
     public var debugDescription: String {
         switch(self) {
@@ -194,7 +192,7 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
         self.log.info("startRecording")
 
         do {
-            if(UseAudioRecorder) {
+            if(self.useAudioRecorder) {
                 if let recorder = self.recorder {
                     recorder.stop()
                     self.recorder = nil
@@ -283,6 +281,7 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
         case VoiceChatMode
     }
     var brokeBy: PttBreakType = .None
+    var useAudioRecorder = true
 
     func startPTT() {
         guard let channelManager = self.channelManager else { return }
