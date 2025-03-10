@@ -9,6 +9,16 @@ struct ContentView: View {
         VStack {
             Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.05)
 
+            Divider()
+            Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
+            HStack {
+                Spacer()
+                Toggle(isOn: $controller.useAVAudioEngine) {
+                    Text("Use AVAudioEngine")
+                }
+                Spacer()
+            }
+            Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
             HStack {
                 Spacer()
                 Toggle(isOn: $controller.useAVAudioRecorder) {
@@ -17,6 +27,8 @@ struct ContentView: View {
                 Spacer()
             }
             Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
+            Divider()
+            Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
             HStack {
                 Spacer()
                 Toggle(isOn: $controller.useVoiceChatMode) {
@@ -24,6 +36,8 @@ struct ContentView: View {
                 }
                 Spacer()
             }
+            Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
+            Divider()
 
             Spacer()
 

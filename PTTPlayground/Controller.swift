@@ -16,16 +16,30 @@ class Controller: ObservableObject {
         }
     }
 
-    var useAVAudioRecorder: Bool {
+    @Published private(set) var useImplementation: PTT.ImplementationType = .AVAudioEngine {
+        didSet {
+            self.ptt.implementation = self.useImplementation
+        }
+    }
+    var useAVAudioEngine: Bool {
         get {
-            self.ptt.useAudioRecorder
+            self.useImplementation == .AVAudioEngine
         }
         set {
-            self.ptt.useAudioRecorder = newValue
+            self.useImplementation = .AVAudioEngine
+        }
+    }
+    var useAVAudioRecorder: Bool {
+        get {
+            self.useImplementation == .AVAudioRecorder
+        }
+        set {
+            self.useImplementation = .AVAudioRecorder
         }
     }
 
     init() {
+        self.ptt.implementation = self.useImplementation
         AVAudioApplication.requestRecordPermission() { granted in
             Task { @MainActor in
                 self.pttEnabled = granted

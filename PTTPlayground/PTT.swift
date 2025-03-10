@@ -186,7 +186,16 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
         self.log.info("startRecording")
 
         do {
-            if(self.useAudioRecorder) {
+            switch(self.implementation) {
+            case .AVAudioEngine:
+                let engine = AVAudioEngine()
+                defer { engine.stop() }
+                let inputNode = engine.inputNode // just to create node accessing mic
+                try inputNode.setVoiceProcessingEnabled(false)
+                try engine.start()
+                try await Task.sleep(for: .milliseconds(300))
+            case .AVAudioRecorder:
+                assert(self.recorder == nil)
                 if let recorder = self.recorder {
                     recorder.stop()
                     self.recorder = nil
@@ -207,13 +216,6 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
                 recorder.delegate = self.recorderDelegate
                 self.recorder = recorder
                 recorder.record()
-            } else {
-                let engine = AVAudioEngine()
-                defer { engine.stop() }
-                let inputNode = engine.inputNode // just to create node accessing mic
-                try inputNode.setVoiceProcessingEnabled(false)
-                try engine.start()
-                try await Task.sleep(for: .milliseconds(300))
             }
         } catch {
             self.log.error("PTT Error: \(error)")
@@ -280,7 +282,11 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
         }
     }
 
-    var useAudioRecorder = true
+    enum ImplementationType {
+        case AVAudioEngine
+        case AVAudioRecorder
+    }
+    var implementation: ImplementationType = .AVAudioEngine
 
     func startPTT() {
         guard let channelManager = self.channelManager else { return }
