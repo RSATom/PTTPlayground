@@ -27,6 +27,14 @@ struct ContentView: View {
                 Spacer()
             }
             Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
+            HStack {
+                Spacer()
+                Toggle(isOn: $controller.useAudioUnit) {
+                    Text("Use Voice Processing Audio Unit")
+                }
+                Spacer()
+            }
+            Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
             Divider()
             Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
             HStack {

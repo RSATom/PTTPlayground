@@ -4,6 +4,7 @@ import Foundation
 import Synchronization
 import AVFAudio
 import PushToTalk
+import AudioToolbox
 
 extension AVAudioSession.RouteChangeReason: @retroactive CustomDebugStringConvertible {
     public var debugDescription: String {
@@ -182,6 +183,8 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
     @MainActor
     private var recorder: AVAudioRecorder? = nil
     @MainActor
+    private var audioUnit: AudioComponentInstance? = nil
+    @MainActor
     private func startRecording() async {
         self.log.info("startRecording")
 
@@ -216,6 +219,131 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
                 recorder.delegate = self.recorderDelegate
                 self.recorder = recorder
                 recorder.record()
+            case .VoiceProcessingAudioUnit:
+                assert(self.audioUnit == nil)
+                var description = AudioComponentDescription(
+                    componentType: kAudioUnitType_Output,
+                    componentSubType: kAudioUnitSubType_VoiceProcessingIO,
+                    componentManufacturer: kAudioUnitManufacturer_Apple,
+                    componentFlags: 0,
+                    componentFlagsMask: 0)
+
+                let component = AudioComponentFindNext(nil, &description)
+                guard let component = component else { return }
+
+                AudioComponentInstanceNew(component, &self.audioUnit)
+
+                guard let audioUnit = self.audioUnit else { return }
+
+                let kInputBus: AudioUnitElement = 1
+                let kOutputBus: AudioUnitElement = 0
+
+                var enableInput: UInt32 = 1
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioOutputUnitProperty_EnableIO,
+                    kAudioUnitScope_Input,
+                    kInputBus,
+                    &enableInput,
+                    UInt32(MemoryLayout.size(ofValue: enableInput)))
+
+                var enableOutput: UInt32 = 1
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioOutputUnitProperty_EnableIO,
+                    kAudioUnitScope_Output,
+                    kOutputBus,
+                    &enableOutput,
+                    UInt32(MemoryLayout.size(ofValue: enableInput)))
+
+                var outputCallback = AURenderCallbackStruct(
+                    inputProc: { inRefCon, ioActionFlags, inTimeStamp, inBusNumber, inNumberFrames, ioData in
+                        return noErr
+                    },
+                    inputProcRefCon: nil
+                )
+
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioUnitProperty_SetRenderCallback,
+                    kAudioUnitScope_Input,
+                    kOutputBus,
+                    &outputCallback,
+                    UInt32(MemoryLayout.size(ofValue: outputCallback)));
+
+                var shouldAllocateBuffer: UInt32 = 0
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioUnitProperty_ShouldAllocateBuffer,
+                    kAudioUnitScope_Output,
+                    kInputBus,
+                    &shouldAllocateBuffer,
+                    UInt32(MemoryLayout.size(ofValue: shouldAllocateBuffer)))
+
+                var inputCallback = AURenderCallbackStruct(
+                    inputProc: { inRefCon, ioActionFlags, inTimeStamp, inBusNumber, inNumberFrames, ioData in
+                        return noErr
+                    },
+                    inputProcRefCon: nil
+                )
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioOutputUnitProperty_SetInputCallback,
+                    kAudioUnitScope_Global,
+                    kInputBus,
+                    &inputCallback,
+                    UInt32(MemoryLayout.size(ofValue: inputCallback)));
+
+                var audioFormat = AudioStreamBasicDescription(
+                    mSampleRate: 48000,
+                    mFormatID: kAudioFormatLinearPCM,
+                    mFormatFlags: kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked,
+                    mBytesPerPacket: 2,
+                    mFramesPerPacket: 1,
+                    mBytesPerFrame: 2,
+                    mChannelsPerFrame: 1,
+                    mBitsPerChannel: 8 * 2,
+                    mReserved: 0)
+
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioUnitProperty_StreamFormat,
+                    kAudioUnitScope_Output,
+                    kInputBus,
+                    &audioFormat,
+                    UInt32(MemoryLayout.size(ofValue: audioFormat)));
+
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioUnitProperty_StreamFormat,
+                    kAudioUnitScope_Input,
+                    kOutputBus,
+                    &audioFormat,
+                    UInt32(MemoryLayout.size(ofValue: audioFormat)));
+
+                AudioUnitInitialize(audioUnit);
+
+                if(false) {
+                    var bypassVoiceProcessing: UInt32 = 1
+                    AudioUnitSetProperty(
+                        audioUnit,
+                        kAUVoiceIOProperty_BypassVoiceProcessing,
+                        kAudioUnitScope_Global,
+                        kInputBus,
+                        &bypassVoiceProcessing,
+                        UInt32(MemoryLayout.size(ofValue: bypassVoiceProcessing)));
+                }
+
+                var enableAgc: UInt32 = 1
+                AudioUnitSetProperty(
+                    audioUnit,
+                    kAUVoiceIOProperty_VoiceProcessingEnableAGC,
+                    kAudioUnitScope_Global,
+                    kInputBus,
+                    &enableAgc,
+                    UInt32(MemoryLayout.size(ofValue: enableAgc)));
+
+                AudioOutputUnitStart(audioUnit);
             }
         } catch {
             self.log.error("PTT Error: \(error)")
@@ -225,10 +353,17 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
     private func stopRecording() {
         self.log.info("stopRecording")
 
-        guard let recorder = self.recorder else { return }
+        if let recorder = self.recorder {
+            self.recorder = nil
+            recorder.stop()
+        }
 
-        self.recorder = nil
-        recorder.stop()
+        if let audioUnit = self.audioUnit {
+            self.audioUnit = nil
+            AudioOutputUnitStop(audioUnit)
+            AudioUnitUninitialize(audioUnit)
+            AudioComponentInstanceDispose(audioUnit)
+        }
     }
 
     override init() {
@@ -285,6 +420,7 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
     enum ImplementationType {
         case AVAudioEngine
         case AVAudioRecorder
+        case VoiceProcessingAudioUnit
     }
     var implementation: ImplementationType = .AVAudioEngine
 

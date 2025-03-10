@@ -16,7 +16,7 @@ class Controller: ObservableObject {
         }
     }
 
-    @Published private(set) var useImplementation: PTT.ImplementationType = .AVAudioEngine {
+    @Published private(set) var useImplementation: PTT.ImplementationType = .VoiceProcessingAudioUnit {
         didSet {
             self.ptt.implementation = self.useImplementation
         }
@@ -35,6 +35,14 @@ class Controller: ObservableObject {
         }
         set {
             self.useImplementation = .AVAudioRecorder
+        }
+    }
+    var useAudioUnit: Bool {
+        get {
+            self.useImplementation == .VoiceProcessingAudioUnit
+        }
+        set {
+            self.useImplementation = .VoiceProcessingAudioUnit
         }
     }
 
