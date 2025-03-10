@@ -19,8 +19,8 @@ struct ContentView: View {
             Spacer().frame(maxHeight: UIScreen.main.bounds.size.height * 0.03)
             HStack {
                 Spacer()
-                Toggle(isOn: $controller.breakPtt) {
-                    Text("Break PTT Start sound")
+                Toggle(isOn: $controller.useVoiceChatMode) {
+                    Text("Use .voiceChat mode")
                 }
                 Spacer()
             }

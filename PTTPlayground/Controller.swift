@@ -7,14 +7,15 @@ class Controller: ObservableObject {
 
     @Published private(set) var pttEnabled: Bool = false
 
-    var breakPtt: Bool {
+    var useVoiceChatMode: Bool {
         get {
-            self.ptt.brokeBy != .None
+            self.ptt.useVoiceChatMode
         }
         set {
-            self.ptt.brokeBy = newValue ? .VoiceChatMode : .None
+            self.ptt.useVoiceChatMode = newValue
         }
     }
+
     var useAVAudioRecorder: Bool {
         get {
             self.ptt.useAudioRecorder

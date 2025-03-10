@@ -1,6 +1,7 @@
 import os
 import UIKit
 import Foundation
+import Synchronization
 import AVFAudio
 import PushToTalk
 
@@ -42,15 +43,6 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
     private var didJoinChannel: Bool = false
     private var didBeginTransmitting: Bool = false
     private var didActivate: Bool = false
-
-    private static func forceSpeakerOutput() {
-        do {
-            PTT.log.info("Forcing audio output to speaker...")
-            try AVAudioSession.sharedInstance().overrideOutputAudioPort(.speaker)
-        } catch {
-            PTT.log.error("Failed to override output audio port: \(error)")
-        }
-    }
 
     func channelDescriptor(restoredChannelUUID channelUUID: UUID) -> PTChannelDescriptor {
         self.log.info("restoredChannelUUID")
@@ -112,27 +104,29 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
     func channelManager(_ channelManager: PTChannelManager, channelUUID: UUID, didBeginTransmittingFrom source: PTChannelTransmitRequestSource) {
         self.log.info("didBeginTransmitting")
 
+        do {
+            self.log.info("Configuring audio session category...")
+            if(self._useVoiceChatMode.load(ordering: .relaxed)) {
+                try self.audioSession.setCategory(
+                    .playAndRecord,
+                    mode: .voiceChat,
+                    options: [.allowBluetooth])
+            } else {
+                try self.audioSession.setCategory(
+                    .playAndRecord,
+                    mode: .default,
+                    options: [.allowBluetooth])
+            }
+
+            self.log.info("Forcing audio output to speaker...")
+            try self.audioSession.overrideOutputAudioPort(.speaker)
+
+        } catch {
+            self.log.error("Failed to configure audio session: \(error)")
+        }
+
         Task { @MainActor in
             self.didBeginTransmitting = true
-
-            do {
-                switch(self.brokeBy) {
-                case .None:
-                    try self.audioSession.setCategory(
-                        .playAndRecord,
-                        mode: .default,
-                        options: [.allowBluetooth])
-                case .VoiceChatMode:
-                    try self.audioSession.setCategory(
-                        .playAndRecord,
-                        mode: .voiceChat,
-                        options: [.allowBluetooth])
-                }
-
-                Self.forceSpeakerOutput()
-            } catch {
-                self.log.error("Error setting audio session category: \(error)")
-            }
         }
     }
 
@@ -276,11 +270,16 @@ class PTT: NSObject, PTChannelRestorationDelegate, PTChannelManagerDelegate {
         }
     }
 
-    enum PttBreakType {
-        case None
-        case VoiceChatMode
+    private let _useVoiceChatMode = Atomic<Bool>(true)
+    var useVoiceChatMode: Bool {
+        get {
+            self._useVoiceChatMode.load(ordering: .relaxed)
+        }
+        set {
+            self._useVoiceChatMode.store(newValue, ordering: .relaxed)
+        }
     }
-    var brokeBy: PttBreakType = .None
+
     var useAudioRecorder = true
 
     func startPTT() {
